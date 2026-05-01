@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频转字符动画</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">视频转字符动画</h1>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- 左侧：上传和控制 -->
+            <div class="space-y-6">
+                <!-- 上传区域 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4">上传视频</h2>
+                    <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition">
+                        <i class="fa fa-upload text-4xl text-gray-400 mb-2"></i>
+                        <p class="text-gray-600">点击或拖放视频文件</p>
+                        <p class="text-gray-400 text-sm mt-1">支持 MP4, AVI, MOV</p>
+                        <input type="file" id="videoInput" accept="video/*" class="hidden">
+                    </div>
+                    <div id="videoInfo" class="mt-4 hidden">
+                        <div class="flex items-center justify-between bg-gray-50 p-3 rounded">
+                            <div class="flex items-center">
+                                <i class="fa fa-file-video-o text-blue-500 mr-2"></i>
+                                <span id="fileName" class="font-medium"></span>
+                            </div>
+                            <button id="removeVideo" class="text-red-500 hover:text-red-700">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 参数设置 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4">参数设置</h2>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-gray-700 mb-2">分辨率下降倍数</label>
+                            <input type="range" id="times" min="4" max="20" value="8" class="w-full">
+                            <div class="flex justify-between text-sm text-gray-500 mt-1">
+                                <span>4 (高质量)</span>
+                                <span id="timesValue">8</span>
+                                <span>20 (低质量)</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-gray-700 mb-2">跳帧处理</label>
+                            <select id="skipFrames" class="w-full px-4 py-2 border rounded-lg">
+                                <option value="1">处理所有帧 (1:1)</option>
+                                <option value="2">每2帧处理1帧 (2:1) - 速度提升约2倍</option>
+                                <option value="3">每3帧处理1帧 (3:1) - 速度提升约3倍</option>
+                                <option value="4">每4帧处理1帧 (4:1) - 速度提升约4倍</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-gray-700 mb-2">并行线程数</label>
+                            <select id="threads" class="w-full px-4 py-2 border rounded-lg">
+                                <option value="1">单线程 (1)</option>
+                                <option value="2">2 线程</option>
+                                <option value="4" selected>4 线程 (推荐)</option>
+                                <option value="8">8 线程</option>
+                                <option value="16">16 线程</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <label class="text-gray-700">彩色模式</label>
+                            <input type="checkbox" id="color" class="w-5 h-5">
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <label class="text-gray-700">保留音频</label>
+                            <input type="checkbox" id="keepAudio" checked class="w-5 h-5">
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <label class="text-gray-700">删除帧图片</label>
+                            <input type="checkbox" id="deleteFrames" checked value="true" class="w-5 h-5">
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <label class="text-gray-700">输出 MP4</label>
+                            <input type="checkbox" id="mp4" class="w-5 h-5">
+                        </div>
+
+                        <div>
+                            <label class="block text-gray-700 mb-2">输出文件名</label>
+                            <input type="text" id="outputName" class="w-full px-4 py-2 border rounded-lg" placeholder="留空则自动生成">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 转换按钮 -->
+                <button id="generateBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    <i class="fa fa-magic mr-2"></i>开始转换
+                </button>
+
+                <!-- 进度显示 -->
+                <div id="progressSection" class="bg-white rounded-lg shadow-md p-6 hidden">
+                    <h2 class="text-xl font-semibold mb-4">转换进度</h2>
+                    <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
+                        <div id="progressBar" class="bg-blue-600 h-4 rounded-full transition-all" style="width: 0%"></div>
+                    </div>
+                    <p id="progressText" class="text-gray-600 text-center mb-2"></p>
+                    <div id="progressDetail" class="text-sm text-gray-500 text-center"></div>
+                </div>
+            </div>
+
+            <!-- 右侧：预览和历史 -->
+            <div class="space-y-6">
+                <!-- 预览区域 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4">预览</h2>
+                    <div id="previewContainer" class="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
+                        <p class="text-gray-500">转换完成后在此预览</p>
+                    </div>
+                    <div id="previewControls" class="mt-4 flex justify-between hidden">
+                        <button id="playBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                            <i class="fa fa-play mr-2"></i>播放
+                        </button>
+                        <button id="downloadBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                            <i class="fa fa-download mr-2"></i>下载
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 历史记录 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4">历史记录</h2>
+                    <div id="historyList" class="space-y-2 max-h-64 overflow-y-auto">
+                        <p class="text-gray-500 text-center">暂无历史记录</p>
+                    </div>
+                </div>
+
+                <!-- 查看日志 -->
+                <button id="viewLogsBtn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition">
+                    <i class="fa fa-file-text-o mr-2"></i>查看日志
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 日志弹窗 -->
+    <div id="logModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg p-6 w-3/4 max-h-screen overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">处理日志</h3>
+                <button id="closeLogModal" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            <pre id="logContent" class="bg-gray-100 p-4 rounded-lg overflow-auto text-sm font-mono whitespace-pre-wrap flex-1" style="max-height: 60vh;"></pre>
+            <button id="refreshLogsBtn" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg">
+                <i class="fa fa-refresh mr-2"></i>刷新日志
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let generatedVideoUrl = null;
+        let currentTaskId = null;
+
+        document.getElementById('times').addEventListener('input', function() {
+            document.getElementById('timesValue').textContent = this.value;
+        });
+
+        document.getElementById('dropZone').addEventListener('click', () => {
+            document.getElementById('videoInput').click();
+        });
+
+        document.getElementById('videoInput').addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('video/')) {
+                alert('请上传视频文件');
+                return;
+            }
+            selectedFile = file;
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('videoInfo').classList.remove('hidden');
+        }
+
+        document.getElementById('removeVideo').addEventListener('click', () => {
+            selectedFile = null;
+            document.getElementById('videoInfo').classList.add('hidden');
+        });
+
+        document.getElementById('generateBtn').addEventListener('click', function() {
+            if (!selectedFile) {
+                alert('请先上传视频文件');
+                return;
+            }
+            generateVideo();
+        });
+
+        function generateVideo() {
+            const formData = new FormData();
+            formData.append('video', selectedFile);
+            formData.append('times', document.getElementById('times').value);
+            formData.append('skip_frames', document.getElementById('skipFrames').value);
+            formData.append('threads', document.getElementById('threads').value);
+            formData.append('color', document.getElementById('color').checked ? 'true' : 'false');
+            formData.append('keep_audio', document.getElementById('keepAudio').checked ? 'true' : 'false');
+            formData.append('keep_frames', document.getElementById('deleteFrames').checked ? 'false' : 'true');
+            formData.append('mp4', document.getElementById('mp4').checked ? 'true' : 'false');
+            formData.append('name', document.getElementById('outputName').value || '');
+
+            document.getElementById('progressSection').classList.remove('hidden');
+            document.getElementById('generateBtn').disabled = true;
+            document.getElementById('progressBar').style.width = '0%';
+            document.getElementById('progressText').textContent = '准备中...';
+
+            fetch('/api/generate', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.success && data.task_id) {
+                      currentTaskId = data.task_id;
+                      pollProgress(data.task_id);
+                  } else {
+                      alert('生成失败: ' + (data.error || '未知错误'));
+                      document.getElementById('generateBtn').disabled = false;
+                  }
+              })
+              .catch(error => {
+                  alert('请求失败: ' + error.message);
+                  document.getElementById('generateBtn').disabled = false;
+              });
+        }
+
+        function pollProgress(task_id) {
+            const pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/progress/${task_id}`);
+                    const data = await response.json();
+
+                    if (data.success) {
+                        const { progress, message, status, filename, current_frame, total_frames, phase } = data.data;
+
+                        document.getElementById('progressBar').style.width = `${progress}%`;
+                        document.getElementById('progressText').textContent = message;
+
+                        let detailText = '';
+                        if (phase === 'processing' && current_frame && total_frames) {
+                            detailText = `帧: ${current_frame}/${total_frames} (${progress}%)`;
+                        } else if (phase === 'merging') {
+                            detailText = `合并中... ${progress}%`;
+                        } else if (phase === 'audio') {
+                            detailText = `处理音频...`;
+                        }
+                        document.getElementById('progressDetail').textContent = detailText;
+
+                        if (status === 'completed') {
+                            clearInterval(pollInterval);
+                            document.getElementById('generateBtn').disabled = false;
+                            generatedVideoUrl = `/api/preview?file=${filename}`;
+                            showPreview(filename);
+                            loadHistory();
+                            alert('转换成功！');
+                        } else if (status === 'error') {
+                            clearInterval(pollInterval);
+                            document.getElementById('generateBtn').disabled = false;
+                            alert('转换失败: ' + message);
+                        }
+                    }
+                } catch (error) {
+                    console.error('进度查询失败:', error);
+                }
+            }, 1000);
+        }
+
+        function showPreview(filename) {
+            const previewContainer = document.getElementById('previewContainer');
+            const fileExtension = filename.split('.').pop().toLowerCase();
+            let mimeType = 'video/mp4';
+            if (fileExtension === 'avi') mimeType = 'video/x-msvideo';
+
+            previewContainer.innerHTML = `
+                <video id="previewVideo" controls class="w-full h-full rounded-lg">
+                    <source src="${generatedVideoUrl}" type="${mimeType}">
+                    您的浏览器不支持视频播放。
+                </video>
+            `;
+            document.getElementById('previewControls').classList.remove('hidden');
+        }
+
+        document.getElementById('playBtn').addEventListener('click', function() {
+            const video = document.getElementById('previewVideo');
+            if (video.paused) {
+                video.play();
+                this.innerHTML = '<i class="fa fa-pause mr-2"></i>暂停';
+            } else {
+                video.pause();
+                this.innerHTML = '<i class="fa fa-play mr-2"></i>播放';
+            }
+        });
+
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            if (generatedVideoUrl) {
+                const a = document.createElement('a');
+                a.href = generatedVideoUrl;
+                a.download = document.getElementById('outputName').value || 'output';
+                a.click();
+            }
+        });
+
+        function loadHistory() {
+            fetch('/api/history')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.files.length > 0) {
+                        const historyList = document.getElementById('historyList');
+                        historyList.innerHTML = data.files.slice(0, 10).map(file => {
+                            const date = new Date(file.mtime * 1000);
+                            return `
+                                <div class="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 cursor-pointer" onclick="loadHistoryItem('${file.filename}')">
+                                    <div>
+                                        <p class="font-medium">${file.filename}</p>
+                                        <p class="text-xs text-gray-500">${date.toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                })
+                .catch(error => console.error('加载历史失败:', error));
+        }
+
+        function loadHistoryItem(filename) {
+            generatedVideoUrl = `/api/preview?file=${filename}`;
+            showPreview(filename);
+        }
+
+        document.getElementById('viewLogsBtn').addEventListener('click', function() {
+            loadLogs();
+            document.getElementById('logModal').classList.remove('hidden');
+        });
+
+        document.getElementById('closeLogModal').addEventListener('click', function() {
+            document.getElementById('logModal').classList.add('hidden');
+        });
+
+        document.getElementById('refreshLogsBtn').addEventListener('click', loadLogs);
+
+        function loadLogs() {
+            fetch('/api/logs')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('logContent').textContent = data.logs || '暂无日志';
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('logContent').textContent = '加载日志失败: ' + error.message;
+                });
+        }
+
+        loadHistory();
+    </script>
+</body>
+</html>
